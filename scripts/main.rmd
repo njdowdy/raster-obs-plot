@@ -40,14 +40,26 @@ Read in each range file, calculate the area of each polygon (see area() in *rast
 * Measure area of range
 * Write out in in new columns of "specieslist.csv":
   * Range size
-  * Range size as a proportion of continental US area (?)
-  * Total number of records needed (this would be the 8 mil records) (?)
-  * New records added (total records needed - current records) (?)
+  * Range size as a proportion of continental US area, plus Alaska and Hawaii
+  * Total number of records needed (this would be the 6 mil potentially digitizable records)
+    * Assume there are ~6 million undigitized, but potentially digitizable specimen records
+    * How can we estimate the distribution of these 6 million records over these taxa?
+      * Option 1: evenly distributed
+        * Probably not realistic; assumes prior digitization has occurred in proportion to holdings
+      * Option 2: differentially weighted based on some metric (e.g., range size, proportion of currently digitized records, etc)
+        * Not clear what criteria would best capture the number of remaining undigitized specimens for all species
+  * New records added (total records needed - current records)
 * Based on number of "New Records Added", generate N random lat/long points within each species' range
 * Export generated lat/longs into a csv file for each corresponding taxon
+  * Artificial Observation ID, Family, Genus, Species, Latitude, Longitude
 
 ```{r echo=FALSE}
 df <- as.data.frame(read.csv(input_csv_location))
 datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 200, scroller = TRUE, scrollX = 200, pageLength = 1))
 ```
 
+## TO DO:
+
+1. Reorganize raster files
+  * All files in one directory, spaces removed
+2. Split taxon name in csv to genus and species columns
