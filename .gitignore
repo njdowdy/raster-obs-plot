@@ -1,3 +1,7 @@
+# ignore extracted files - too numerous to push
+/input/extracted/*
+/images/*
+
 # History files
 .Rhistory
 .Rapp.history
