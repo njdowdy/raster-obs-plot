@@ -19,15 +19,17 @@ library(DT) # for making nice tables
 
 ## Summary of Input Data
 
-The file "input/specieslist.csv" contains a list of 3685 North American species of Hymenoptera. This file contains:
-  1. Species Name
-  2. Corresponding Family
-  3. Corresponding Number of Occurrence Records
+The file "input/specieslist.csv" contains a list of 3685 North American species of Hymenoptera. For each taxon, this file contains:
+  1. Family Name
+  2. Genus Name
+  3. Species Name
+  4. "Name" (genus_species)
+  5. Corresponding Number of Occurrence Records
 
 Spatial polygons have been previously generated for each taxon and are composed of two files with extensions ".grd" and ".gri". The corresponding files for each taxon are stored in:
 
-1. `../input/extracted/range_data_rasters/family_Predicted/220km/genus species_raster.grd`
-2. `../input/extracted/range_data_rasters/family_Predicted/220km/genus species_raster.gri`
+1. `../input/extracted/range_data_rasters/220km_family_genus_species_raster.grd`
+2. `../input/extracted/range_data_rasters/220km_family_genus_species_raster.gri`
 
 ** Note: these are stored in a .7z archive in the repository and need to be extracted
 
@@ -57,9 +59,3 @@ Read in each range file, calculate the area of each polygon (see area() in *rast
 df <- as.data.frame(read.csv(input_csv_location))
 datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 200, scroller = TRUE, scrollX = 200, pageLength = 1))
 ```
-
-## TO DO:
-
-1. Reorganize raster files
-  * All files in one directory, spaces removed
-2. Split taxon name in csv to genus and species columns
