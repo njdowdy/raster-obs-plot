@@ -1,0 +1,53 @@
+---
+title: "North American Bee Data - Raster and Observation Plots"
+author: "Dr. Nicolas J. Dowdy"
+date: '2021-01-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(12345) # set seed for code reproducibility
+# set resource locations
+input_csv_location = "../input/specieslist.csv"
+raster_location = "../input/extracted/range_data_rasters/"
+image_location = "../images/"
+# imports
+library(DT) # for making nice tables
+```
+![](`r paste(image_location, 'bees.jpg', sep='')`){width=50%}
+
+## Summary of Input Data
+
+The file "input/specieslist.csv" contains a list of 3685 North American species of Hymenoptera. This file contains:
+  1. Species Name
+  2. Corresponding Family
+  3. Corresponding Number of Occurrence Records
+
+Spatial polygons have been previously generated for each taxon and are composed of two files with extensions ".grd" and ".gri". The corresponding files for each taxon are stored in:
+
+1. `../input/extracted/range_data_rasters/family_Predicted/220km/genus species_raster.grd`
+2. `../input/extracted/range_data_rasters/family_Predicted/220km/genus species_raster.gri`
+
+** Note: these are stored in a .7z archive in the repository and need to be extracted
+
+## Code Requirements
+
+Read in each range file, calculate the area of each polygon (see area() in *raster* package), add the calculated area to the csv document. 
+
+* Loop over species
+* Read in raster
+* Measure area of range
+* Write out in in new columns of "specieslist.csv":
+  * Range size
+  * Range size as a proportion of continental US area (?)
+  * Total number of records needed (this would be the 8 mil records) (?)
+  * New records added (total records needed - current records) (?)
+* Based on number of "New Records Added", generate N random lat/long points within each species' range
+* Export generated lat/longs into a csv file for each corresponding taxon
+
+```{r echo=FALSE}
+df <- as.data.frame(read.csv(input_csv_location))
+datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 200, scroller = TRUE, scrollX = 200, pageLength = 1))
+```
+
