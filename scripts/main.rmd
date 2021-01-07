@@ -9,9 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 set.seed(12345) # set seed for code reproducibility
 # set resource locations
-input_csv_location = "../input/specieslist.csv"
-raster_location = "../input/extracted/range_data_rasters/"
-image_location = "../images/"
+input_csv_location = "./input/specieslist.csv"
+raster_location = "./input/extracted/range_data_rasters/"
+shape_files_location = "./input/extracted/shape-files/"
+image_location = "./images/"
 # imports
 library(DT) # for making nice tables
 ```
@@ -59,3 +60,70 @@ Read in each range file, calculate the area of each polygon (see area() in *rast
 df <- as.data.frame(read.csv(input_csv_location))
 datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 200, scroller = TRUE, scrollX = 200, pageLength = 1))
 ```
+
+```{r echo=FALSE}
+library(raster)
+library(rasterVis)
+library(rgdal)
+library(rgeos)
+library(ggmap)
+library(ggplot2)
+
+## need to read in the shape files and crop
+usa=readOGR(paste(shape_files_location, "usa" ,sep=""))
+globe=readOGR(paste(shape_files_location, "continents" ,sep=""))
+NAm=globe[globe$CONTINENT=='North America',]
+NAm=crop(NAm,extent(-165,-60,8,85))
+usaWGS=spTransform(usa,CRS(proj4string(NAm)))
+
+# map for plotting
+map_all_nam <- get_map(location='united states', zoom=3, maptype = "satellite",
+             source='google',color='color')
+
+taxa <- df$names
+grd_files <- list.files("./input/extracted/range_data_rasters/", pattern = "\\.grd$")
+for (taxon in taxa) {
+  # taxon = "Epeoloides_pilosulus"
+  raster_file = grd_files[grep(taxon, grd_files)]
+  raster = raster(paste(raster_location, raster_file, sep=""))
+  raster_usawgs = mask(raster, usaWGS)
+  raster_nam = mask(raster, NAm)
+  plot(raster_nam)
+  df_area <- as.data.frame(raster_usawgs, xy=T) 
+  colnames(df_area) <- c("long", "lat", "presence_absence")
+  df_area$presence_absence <- as.factor(df_area$presence_absence)
+  df_area_restrict <- df_area %>% filter(!is.na(presence_absence))
+  
+  # produce a rough map of the distribution (resolution = 220km2)
+  ggmap(map_all_nam) +
+    geom_point(data = df_area_restrict, aes(x = long, y = lat, color = presence_absence), size = 2) +
+    guides(fill=FALSE, alpha=FALSE, size=FALSE) +
+    scale_colour_manual(values = c("black","red")) # for test taxon, how can there only be 39 records in specieslist.csv? The range map suggest at least 46.
+  
+  # calculate area
+  area <- (count((df_area_restrict %>% filter(presence_absence == 1)))*220*220)$n
+  # wikipedia data:
+  # total area of all 50 states: 9,833,517 km2
+  # '                ' contiguous US: 8,081,867 km2
+  # total land area of all 50 state: 9,147,593 km2
+  # '                ' contiguous US: 7,653,004 km2
+  # calculated from raster: 13,019,600 km2
+  area_prop <- area / (nrow(df_area_restrict)*220*220)
+  area_prop2 <- area / 9833517
+  
+  # generate new records
+  number_of_new_records = 6000000 / length(grd_files) # evenly distribute over all these species
+  new_records_added = number_of_new_records - (df %>% filter(name == taxon))$n
+  
+  # generate random points
+  # can sample from a list of latitude and longitude limits
+  # however, this can generate points outside of the range due to non-rectangular shape
+  # would need a large list of lat-long pairs for each taxon that are ok to sample from
+  # the lat/long in df_area_restrict is a good start, but those are the centers
+  # of large areas - maybe just jitter +/- 110km lat/long?
+  # km distance between each degree lat/long varies, so this is not very precise
+  
+}
+
+```
+
