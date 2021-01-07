@@ -1,6 +1,7 @@
 # ignore extracted files - too numerous to push
 /input/extracted/*
 /images/*
+/secret-keys/*
 
 # History files
 .Rhistory
