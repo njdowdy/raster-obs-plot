@@ -13,8 +13,6 @@ input_csv_location = "./input/specieslist.csv"
 raster_location = "./input/extracted/range_data_rasters/"
 shape_files_location = "./input/extracted/shape-files/"
 image_location = "./images/"
-# imports
-library(DT) # for making nice tables
 ```
 ![](`r paste(image_location, 'bees.jpg', sep='')`){width=50%}
 
@@ -45,7 +43,7 @@ Read in each range file, calculate the area of each polygon (see area() in *rast
   * Range size
   * Range size as a proportion of continental US area, plus Alaska and Hawaii
   * Total number of records needed (this would be the 6 mil potentially digitizable records)
-    * Assume there are ~6 million undigitized, but potentially digitizable specimen records
+    * Assume there are ~2 million digitized in this dataset and ~6 million undigitized, but potentially digitizable specimen records
     * How can we estimate the distribution of these 6 million records over these taxa?
       * Option 1: evenly distributed
         * Probably not realistic; assumes prior digitization has occurred in proportion to holdings
@@ -57,11 +55,14 @@ Read in each range file, calculate the area of each polygon (see area() in *rast
   * Artificial Observation ID, Family, Genus, Species, Latitude, Longitude
 
 ```{r echo=FALSE}
-df <- as.data.frame(read.csv(input_csv_location))
-datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 200, scroller = TRUE, scrollX = 200, pageLength = 1))
+# import libraries for this chunk
+library(DT) # for making nice tables
+df <- as.data.frame(read.csv(input_csv_location)) # load data
+datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 200, scroller = TRUE, scrollX = 200, pageLength = 1)) # view datatable in rmarkdown
 ```
 
 ```{r echo=FALSE}
+# load libraries for this chunk
 library(raster)
 library(rasterVis)
 library(rgdal)
@@ -69,61 +70,134 @@ library(rgeos)
 library(ggmap)
 library(ggplot2)
 
-## need to read in the shape files and crop
+## read in the shape files and crop
 usa=readOGR(paste(shape_files_location, "usa" ,sep=""))
 globe=readOGR(paste(shape_files_location, "continents" ,sep=""))
 NAm=globe[globe$CONTINENT=='North America',]
 NAm=crop(NAm,extent(-165,-60,8,85))
 usaWGS=spTransform(usa,CRS(proj4string(NAm)))
 
-# map for plotting
+# generate a map for plotting
+# note don't run this too much - it costs money through Google API key
 map_all_nam <- get_map(location='united states', zoom=3, maptype = "satellite",
-             source='google',color='color')
+             source='google', color='color')
 
-taxa <- df$names
-grd_files <- list.files("./input/extracted/range_data_rasters/", pattern = "\\.grd$")
-for (taxon in taxa) {
-  # taxon = "Epeoloides_pilosulus"
-  raster_file = grd_files[grep(taxon, grd_files)]
-  raster = raster(paste(raster_location, raster_file, sep=""))
-  raster_usawgs = mask(raster, usaWGS)
-  raster_nam = mask(raster, NAm)
-  plot(raster_nam)
-  df_area <- as.data.frame(raster_usawgs, xy=T) 
-  colnames(df_area) <- c("long", "lat", "presence_absence")
-  df_area$presence_absence <- as.factor(df_area$presence_absence)
-  df_area_restrict <- df_area %>% filter(!is.na(presence_absence))
+taxa <- unique(df$name) # get a list of unique taxa
+grd_files <- list.files("./input/extracted/range_data_rasters/", pattern = "\\.grd$") # generate a list of raster locations
+name <- c() # allocate as a temporary list
+area_range <- c() # allocate as a temporary list
+area_prop_blocks_range <- c() # allocate as a temporary list
+area_prop_USA_range <- c() # allocate as a temporary list
+for (taxon in taxa) { # for each taxon in the csv file:
+  # taxon = "Epeoloides_pilosulus" # for testing
+  raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
+  raster = raster(paste(raster_location, raster_file, sep="")) # load the raster
+  raster_usawgs = mask(raster, usaWGS) # mask the raster to the USA shapefile
+  raster_nam = mask(raster, NAm) # mask the raster to the North America shapefile
+  plot(raster_nam) # plot the raster as sanity check
+  df_area <- as.data.frame(raster_usawgs, xy=T) # store the range + USA data in data frame
+  colnames(df_area) <- c("long", "lat", "presence_absence") # change the column names for easy referencing
+  df_area$presence_absence <- as.factor(df_area$presence_absence) # change presence_absence column into factor variable for plotting
+  df_area_restrict <- df_area[!is.na(df_area$presence_absence),] # generate data frame containing only non-NA presence/absence data (not totally necessary, but I prefer it)
   
   # produce a rough map of the distribution (resolution = 220km2)
-  ggmap(map_all_nam) +
-    geom_point(data = df_area_restrict, aes(x = long, y = lat, color = presence_absence), size = 2) +
-    guides(fill=FALSE, alpha=FALSE, size=FALSE) +
-    scale_colour_manual(values = c("black","red")) # for test taxon, how can there only be 39 records in specieslist.csv? The range map suggest at least 46.
+  #ggmap(map_all_nam) +
+  #  geom_point(data = df_area_restrict, aes(x = long, y = lat, color = presence_absence), size = 2) +
+  #  guides(fill=FALSE, alpha=FALSE, size=FALSE) +
+  #  scale_colour_manual(values = c("black","red")) # for test taxon, how can there only be 39 records in specieslist.csv? The range map suggest at least 46.
   
   # calculate area
-  area <- (count((df_area_restrict %>% filter(presence_absence == 1)))*220*220)$n
+  area <- (count((df_area_restrict %>% filter(presence_absence == 1)))*220*220)$n # area of range (220km*220km resolution)
   # wikipedia data:
   # total area of all 50 states: 9,833,517 km2
   # '                ' contiguous US: 8,081,867 km2
   # total land area of all 50 state: 9,147,593 km2
   # '                ' contiguous US: 7,653,004 km2
   # calculated from raster: 13,019,600 km2
-  area_prop <- area / (nrow(df_area_restrict)*220*220)
-  area_prop2 <- area / 9833517
+  area_prop_blocks <- area / (nrow(df_area_restrict)*220*220) # area of range relative to total area of USA (220km*220km resolution); this large resolution leads to large overestimate of area
+  area_prop_USA <- area / 9833517 # area of range relative to reference area of USA (this will lead to slightly larger proportional range sizes due to ranges being at 220km*220km resolution; in other words, USA-restricted ranges are overestimated here due to block size)
   
-  # generate new records
-  number_of_new_records = 6000000 / length(grd_files) # evenly distribute over all these species
-  new_records_added = number_of_new_records - (df %>% filter(name == taxon))$n
+  # store values for writing
+  name <- c(name, taxon)
+  area_range <- c(area_range, area)
+  area_prop_blocks_range <- c(area_prop_blocks_range, area_prop_blocks)
+  area_prop_USA_range <- c(area_prop_USA_range, area_prop_USA)
+}
+temp <- data.frame(name, area_range, area_prop_blocks_range, area_prop_USA_range) # combine temp lists
+new_df <- left_join(df, temp, by="name") # join temp data frame with csv data frame
+```
+
+## Determine Potential Number of Undigitized Records 
+
+* Get sum of all ranges ("total_range_sum")
+* Allocate proportion of 8 million records for each species as:
+    * ((area_range / total_range_sum) * 8000000) - number_existing_occurrence
+
+```{r}
+total_range_sum <- sum(new_df$area_range, na.rm = TRUE) # sum area of all ranges
+new_df <- new_df %>% mutate(record_prop = area_range / total_range_sum) # calculate proportion of each range relative to sum of all ranges
+new_df <- new_df %>% mutate(num_records_to_sample = (8000000 * record_prop) - n) # calculate number of undigitized records
+write.csv(new_df,sub(".csv", "_out.csv",sub("input","output",input_csv_location)), row.names = FALSE) # write out results
+```
+
+## Generate New Points
+
+* For each taxon, generate new records at random lat/longs within the range
+
+```{r}
+df <- as.data.frame(read.csv(sub(".csv", "_out.csv",sub("input","output",input_csv_location)))) # load previously output data
+name <- c() # allocate as a temporary list
+new_long_list <- c() # allocate as a temporary list
+new_lat_list <- c() # allocate as a temporary list
+for (taxon in taxa) { # for each taxon in the csv file:
+  # taxon = "Epeoloides_pilosulus" # for testing
+  # unfortunately, we have to reload rasters:
+  raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
+  raster = raster(paste(raster_location, raster_file, sep="")) # load the raster
+  raster_usawgs = mask(raster, usaWGS) # mask the raster to the USA shapefile
+  raster_nam = mask(raster, NAm) # mask the raster to the North America shapefile
+  plot(raster_nam) # plot the raster as sanity check
+  df_area <- as.data.frame(raster_usawgs, xy=T) # store the range + USA data in data frame
+  colnames(df_area) <- c("long", "lat", "presence_absence") # change the column names for easy referencing
+  df_area$presence_absence <- as.factor(df_area$presence_absence) # change presence_absence column into factor variable for plotting
+  df_area_restrict <- df_area[!is.na(df_area$presence_absence),] # generate data frame containing only non-NA presence/absence data (not totally necessary, but I prefer it)
+  ## generate random points
+  # 220km resolution blocks are 2* x 2*
+  range <- df_area_restrict[df_area_restrict$presence_absence==1,] # get blocks that are part of range
+  lat_list = unique(range$lat) # generate a list of latitudes
+  coordinates <- data.frame() # create a dataframe to store coordinate pairs in
+  for (i in 1:length(lat_list)){ # for each latitude in range:
+    temp <- range %>% filter(lat == lat_list[i]) # return only blocks from that latitude
+    dtemp <- data.frame(temp$long, rep(lat_list[i], length(temp$long))) # create lat/long pairs for each block
+    coordinates <- rbind(coordinates, dtemp) # store these pairs
+  }
+  names(coordinates) <- c("long", "lat") # change the column names for easy referencing
+  new_points <- coordinates[sample(nrow(coordinates), num_records_to_sample, replace = TRUE), ] # sample the coordinate blocks to create new lat/long points
+  random_latlong <- function(x) { # create a function to apply random lat/long jitter
+                         x + sample(seq(-1,1,0.01),1) 
+                        # here we have chosen to add +/- 1 degree of lat and long 
+                        # because block size is 2 degrees, this places a point randomly
+                        # within each block, but not outside that block
+                    }
+  new_long <- t(as.data.frame(lapply(new_points$long, random_latlong))) # apply jitter to longitude
+  new_lat  <- t(as.data.frame(lapply(new_points$lat, random_latlong))) # apply jitter to latitude
+  new_coords <- as.data.frame(cbind(new_long, new_lat)) # store new coordinates
+  names(new_points) <- c("long", "lat") # change the column names for easy referencing
   
-  # generate random points
-  # can sample from a list of latitude and longitude limits
-  # however, this can generate points outside of the range due to non-rectangular shape
-  # would need a large list of lat-long pairs for each taxon that are ok to sample from
-  # the lat/long in df_area_restrict is a good start, but those are the centers
-  # of large areas - maybe just jitter +/- 110km lat/long?
-  # km distance between each degree lat/long varies, so this is not very precise
+  #sanity check plots
+  # points should evenly cover only the portion of the range within USA
+  #plot(raster_nam)
+  #points(new_coords, pch=16, size=1)
   
+  # store values for writing
+  name <- c(name, taxon)
+  new_long_list <- c(new_long_list, new_points$long)
+  new_lat_list <- c(new_lat_list, new_points$lat)
 }
 
+  # add an occurrence_id column (1:length(df))
+  ## WRITE OUT INTO CSV
+  # occurrence_id, name, lat, long
+  
 ```
 
