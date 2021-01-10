@@ -64,11 +64,11 @@ datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 20
 ```{r echo=FALSE}
 # load libraries for this chunk
 library(raster)
-library(rasterVis)
 library(rgdal)
+library(dplyr)
+
+library(rasterVis)
 library(rgeos)
-library(ggmap)
-library(ggplot2)
 
 ## read in the shape files and crop
 usa=readOGR(paste(shape_files_location, "usa" ,sep=""))
@@ -79,8 +79,9 @@ usaWGS=spTransform(usa,CRS(proj4string(NAm)))
 
 # generate a map for plotting
 # note don't run this too much - it costs money through Google API key
-map_all_nam <- get_map(location='united states', zoom=3, maptype = "satellite",
-             source='google', color='color')
+#library(ggmap)
+#register_google_key(key=./secret-keys/google-api-key.txt) # you must provide your own google api key
+#map_all_nam <- get_map(location='united states', zoom=3, maptype = "satellite", source='google', color='color')
 
 taxa <- unique(df$name) # get a list of unique taxa
 grd_files <- list.files("./input/extracted/range_data_rasters/", pattern = "\\.grd$") # generate a list of raster locations
@@ -91,6 +92,7 @@ area_prop_USA_range <- c() # allocate as a temporary list
 for (taxon in taxa) { # for each taxon in the csv file:
   # taxon = "Epeoloides_pilosulus" # for testing
   raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
+  # place a conditional here in case raster is not found
   raster = raster(paste(raster_location, raster_file, sep="")) # load the raster
   raster_usawgs = mask(raster, usaWGS) # mask the raster to the USA shapefile
   raster_nam = mask(raster, NAm) # mask the raster to the North America shapefile
@@ -101,6 +103,7 @@ for (taxon in taxa) { # for each taxon in the csv file:
   df_area_restrict <- df_area[!is.na(df_area$presence_absence),] # generate data frame containing only non-NA presence/absence data (not totally necessary, but I prefer it)
   
   # produce a rough map of the distribution (resolution = 220km2)
+  #library(ggplot2)
   #ggmap(map_all_nam) +
   #  geom_point(data = df_area_restrict, aes(x = long, y = lat, color = presence_absence), size = 2) +
   #  guides(fill=FALSE, alpha=FALSE, size=FALSE) +
@@ -145,13 +148,20 @@ write.csv(new_df,sub(".csv", "_out.csv",sub("input","output",input_csv_location)
 * For each taxon, generate new records at random lat/longs within the range
 
 ```{r}
+library(progress) # creates progress bars (this chunk can take a long time)
 df <- as.data.frame(read.csv(sub(".csv", "_out.csv",sub("input","output",input_csv_location)))) # load previously output data
 name <- c() # allocate as a temporary list
+genus <- c() # allocate as a temporary list
+species <- c() # allocate as a temporary list
 new_long_list <- c() # allocate as a temporary list
 new_lat_list <- c() # allocate as a temporary list
+pb <- progress_bar$new(format = "[:bar] :current/:total (:percent); eta: :eta", total = length(taxa)) # format progress bar
+pb$tick(0) # set start progress
+print("Starting Loop. Go get some coffee!")
 for (taxon in taxa) { # for each taxon in the csv file:
   # taxon = "Epeoloides_pilosulus" # for testing
   # unfortunately, we have to reload rasters:
+  pb$tick(1) # increment progress
   raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
   raster = raster(paste(raster_location, raster_file, sep="")) # load the raster
   raster_usawgs = mask(raster, usaWGS) # mask the raster to the USA shapefile
@@ -172,7 +182,7 @@ for (taxon in taxa) { # for each taxon in the csv file:
     coordinates <- rbind(coordinates, dtemp) # store these pairs
   }
   names(coordinates) <- c("long", "lat") # change the column names for easy referencing
-  new_points <- coordinates[sample(nrow(coordinates), num_records_to_sample, replace = TRUE), ] # sample the coordinate blocks to create new lat/long points
+  new_points <- coordinates[sample(nrow(coordinates), round(pmax(df[df$name==taxon,]$num_records_to_sample,0)), replace = TRUE), ] # sample the coordinate blocks to create new lat/long points
   random_latlong <- function(x) { # create a function to apply random lat/long jitter
                          x + sample(seq(-1,1,0.01),1) 
                         # here we have chosen to add +/- 1 degree of lat and long 
@@ -181,23 +191,29 @@ for (taxon in taxa) { # for each taxon in the csv file:
                     }
   new_long <- t(as.data.frame(lapply(new_points$long, random_latlong))) # apply jitter to longitude
   new_lat  <- t(as.data.frame(lapply(new_points$lat, random_latlong))) # apply jitter to latitude
-  new_coords <- as.data.frame(cbind(new_long, new_lat)) # store new coordinates
-  names(new_points) <- c("long", "lat") # change the column names for easy referencing
-  
-  #sanity check plots
-  # points should evenly cover only the portion of the range within USA
-  #plot(raster_nam)
-  #points(new_coords, pch=16, size=1)
-  
-  # store values for writing
-  name <- c(name, taxon)
-  new_long_list <- c(new_long_list, new_points$long)
-  new_lat_list <- c(new_lat_list, new_points$lat)
+  if(length(new_long) > 0 & length(new_lat) > 0){ # do the rest only if there are coordinates to add
+    new_coords <- as.data.frame(cbind(new_long, new_lat)) # store new coordinates
+    names(new_coords) <- c("long", "lat") # change the column names for easy referencing
+    taxon_name <- rep(taxon, nrow(new_coords))
+    
+    #sanity check plots
+    # points should evenly cover only the portion of the range within USA
+    #plot(raster_nam)
+    #points(new_coords, pch=16, size=1)
+    
+    # store values for writing
+    genus <- c(genus, rep(sapply(strsplit(taxon,"_"), `[`, 1), nrow(new_coords))) # split genus name
+    species <- c(species, rep(sapply(strsplit(taxon,"_"), `[`, 2), nrow(new_coords))) # split species name 
+    name <- c(name, taxon_name)
+    new_long_list <- c(new_long_list, new_coords$long)
+    new_lat_list <- c(new_lat_list, new_coords$lat)
+  }
 }
 
-  # add an occurrence_id column (1:length(df))
-  ## WRITE OUT INTO CSV
-  # occurrence_id, name, lat, long
-  
+  ## Write out new simulated coordinates
+  occurrence_ids <- seq(1, length(new_lat_list), 1) # create unique ids for each simulated occurrence
+  new_lat_long_out <- data.frame(occurrence_ids, genus, species, name, new_long_list, new_lat_list)
+  names(new_lat_long_out) <- c("occurrence_id", "genus", "species", "name", "longitude", "latitude")
+  write.csv(new_lat_long_out,sub(".csv", "_newLatLongs.csv",sub("input","output",input_csv_location)), row.names = FALSE) # write out results
 ```
 
