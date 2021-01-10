@@ -2,6 +2,7 @@
 /input/extracted/*
 /images/*
 /secret-keys/*
+/output/*
 
 # History files
 .Rhistory
