@@ -9,10 +9,11 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 set.seed(12345) # set seed for code reproducibility
 # set resource locations
-input_csv_location = "./input/specieslist.csv"
-raster_location = "./input/extracted/range_data_rasters/"
-shape_files_location = "./input/extracted/shape-files/"
-image_location = "./images/"
+setwd("scripts/")
+input_csv_location = "../input/specieslist.csv"
+raster_location = "../input/extracted/range_data_rasters/"
+shape_files_location = "../input/extracted/shape-files/"
+image_location = "../images/"
 ```
 ![](`r paste(image_location, 'bees.jpg', sep='')`){width=50%}
 
@@ -66,9 +67,10 @@ datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 20
 library(raster)
 library(rgdal)
 library(dplyr)
+library(progress) # creates progress bars (this chunk can take a long time)
 
-library(rasterVis)
-library(rgeos)
+#library(rasterVis) # this may not be needed
+#library(rgeos) # this may not be needed
 
 ## read in the shape files and crop
 usa=readOGR(paste(shape_files_location, "usa" ,sep=""))
@@ -84,12 +86,16 @@ usaWGS=spTransform(usa,CRS(proj4string(NAm)))
 #map_all_nam <- get_map(location='united states', zoom=3, maptype = "satellite", source='google', color='color')
 
 taxa <- unique(df$name) # get a list of unique taxa
-grd_files <- list.files("./input/extracted/range_data_rasters/", pattern = "\\.grd$") # generate a list of raster locations
+grd_files <- list.files(raster_location, pattern = "\\.grd$") # generate a list of raster locations
 name <- c() # allocate as a temporary list
 area_range <- c() # allocate as a temporary list
 area_prop_blocks_range <- c() # allocate as a temporary list
 area_prop_USA_range <- c() # allocate as a temporary list
+pb <- progress_bar$new(format = "[:bar] :current/:total (:percent); eta: :eta", total = length(taxa)) # format progress bar
+pb$tick(0) # set start progress
+print("Starting Loop. Go get some tea!")
 for (taxon in taxa) { # for each taxon in the csv file:
+  pb$tick()
   # taxon = "Epeoloides_pilosulus" # for testing
   raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
   # place a conditional here in case raster is not found
@@ -147,8 +153,7 @@ write.csv(new_df,sub(".csv", "_out.csv",sub("input","output",input_csv_location)
 
 * For each taxon, generate new records at random lat/longs within the range
 
-```{r}
-library(progress) # creates progress bars (this chunk can take a long time)
+```{r echo=FALSE}
 df <- as.data.frame(read.csv(sub(".csv", "_out.csv",sub("input","output",input_csv_location)))) # load previously output data
 name <- c() # allocate as a temporary list
 genus <- c() # allocate as a temporary list
