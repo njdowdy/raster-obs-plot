@@ -66,11 +66,11 @@ datatable(df, extensions = "Scroller", width = 1000, options = list(scrollY = 20
 # load libraries for this chunk
 library(raster)
 library(rgdal)
+library(rgeos)
 library(dplyr)
 library(progress) # creates progress bars (this chunk can take a long time)
 
 #library(rasterVis) # this may not be needed
-#library(rgeos) # this may not be needed
 
 ## read in the shape files and crop
 usa=readOGR(paste(shape_files_location, "usa" ,sep=""))
@@ -94,9 +94,11 @@ area_prop_USA_range <- c() # allocate as a temporary list
 pb <- progress_bar$new(format = "[:bar] :current/:total (:percent); eta: :eta", total = length(taxa)) # format progress bar
 pb$tick(0) # set start progress
 print("Starting Loop. Go get some tea!")
+## for loop could use some speed up from for_each package
 for (taxon in taxa) { # for each taxon in the csv file:
   pb$tick()
   # taxon = "Epeoloides_pilosulus" # for testing
+  # taxon = "Andrena_accepta" # for testing
   raster_file = grd_files[grep(taxon, grd_files)] # find the taxon raster file
   # place a conditional here in case raster is not found
   raster = raster(paste(raster_location, raster_file, sep="")) # load the raster
@@ -163,6 +165,7 @@ new_lat_list <- c() # allocate as a temporary list
 pb <- progress_bar$new(format = "[:bar] :current/:total (:percent); eta: :eta", total = length(taxa)) # format progress bar
 pb$tick(0) # set start progress
 print("Starting Loop. Go get some coffee!")
+## for loop could use some speed up from for_each package
 for (taxon in taxa) { # for each taxon in the csv file:
   # taxon = "Epeoloides_pilosulus" # for testing
   # unfortunately, we have to reload rasters:
@@ -219,6 +222,6 @@ for (taxon in taxa) { # for each taxon in the csv file:
   occurrence_ids <- seq(1, length(new_lat_list), 1) # create unique ids for each simulated occurrence
   new_lat_long_out <- data.frame(occurrence_ids, genus, species, name, new_long_list, new_lat_list)
   names(new_lat_long_out) <- c("occurrence_id", "genus", "species", "name", "longitude", "latitude")
-  write.csv(new_lat_long_out,sub(".csv", "_newLatLongs.csv",sub("input","output",input_csv_location)), row.names = FALSE) # write out results
+  write.csv(new_lat_long_out,sub(".csv", "_newLatLongs_2021-01-13.csv",sub("input","output",input_csv_location)), row.names = FALSE) # write out results
 ```
 
