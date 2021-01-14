@@ -1,0 +1,87 @@
+## add occurrance points onto bee range maps
+## last edited: 14 January 2021
+## last edited by: Erica Fischer
+
+
+rm(list = ls())
+
+### set up workspace
+## load packages
+library(rgeos)
+library(sp)
+library(rgdal)
+library(raster)
+library(purrr)
+library(rlist)
+library(dplyr)
+library(sf)
+library(fs)
+
+## read in data
+setwd("~/Desktop/bee_gap 2020") # obvs set to correct directory; I've been working from local copies of what's on dropbox
+alldat = read.csv("final_bees_for_ranges.csv") # this is the full list of 2.1mil bee records
+spList = read.csv("speciesList.csv") # file of bee spp names
+base = raster("~/Desktop/bee_gap 2020/empty_base_raster.grd")
+
+## baseline georef info
+usa = readOGR(dsn="~/Desktop/bee_gap 2020/Shape Files/USA")
+globe = readOGR("~/Desktop/bee_gap 2020/Shape Files/Continents")
+NAm = globe[globe$CONTINENT=='North America',]
+NAm = crop(NAm,extent(-165,-60,8,85))
+usaWGS = spTransform(usa,CRS(proj4string(NAm)))
+
+## set up space for rasters --need to have .gri and .grd files in order to generate png maps
+range_path <- fs::dir_ls("~/Desktop/bee_gap 2020/30km") # again, change to appropriate file
+ranges <- list()
+
+## subset down the Big CSV to just the species to be fixed
+
+# FOR WHOLE FAMILY: 
+  # famDat = alldat[grepl('Apidae',alldat$family),] #only want records from specific family; change family as needed
+  # famDat = select(famDat,(-X)) # don't want that column, it's random (and will mess up your loop)
+  # famSpp = spList[grepl('Apidae',spList$family),] # limit species names to just appropriate family
+# FOR SELECT PROBLEM SPECIES: 
+  # allDatFix <- alldat %>% dplyr::filter(correctedName %in% spList$species)
+
+### MAKE SURE TO REMOVE SPECIES FOR WHICH A RANGE WAS NOT GENERATED --some families had more than others
+
+
+## read in rasters
+for (i in seq_along(range_path)){
+  ranges[[i]] <- raster(
+    x = range_path[[i]]
+  )
+}
+
+#change names of files/rasters in list
+ranges <- set_names(ranges, range_path)
+
+## need to remove .gri files from list (.gri files have to be available on computer but not in workspace)
+for (i in c(1:190)) { # change 1:x as needed for number of rasters read in; dependent on family
+  ranges[[i+1]] <- NULL
+  i = i+1
+}
+
+### loop to make figures with occurrence dots
+for (i in c(1:95)) { # again, 1:x dependent on family and number of spp. 
+  
+  sp = dplyr::filter(famDat, correctedName == paste(famSpp[i,1]))
+  sp = dplyr::select(sp, decimalLongitude, decimalLatitude)
+  
+  # write new png --change write-to folder as needed
+  png(file=paste(paste("~/Desktop/bee_gap 2020/ranges/30km with occurrences", paste(famSpp[i,1], ".png"), sep="/")), height = 823, width = 1046)
+  
+  # plot range
+  plot(base)
+  plot(ranges[[i]])
+  plot(usaWGS, add = T)
+  
+  # add occurrence points to map
+  points(sp$decimalLongitude, sp$decimalLatitude, col = "purple1", pch = 19, cex = .5)
+  title(main = paste(famSpp[i,1]), cex.main = 2)
+  
+  dev.off()
+  
+  i = i+1
+}
+
