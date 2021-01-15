@@ -65,11 +65,11 @@ for (i in c(1:190)) { # change 1:x as needed for number of rasters read in; depe
 ### loop to make figures with occurrence dots
 for (i in c(1:95)) { # again, 1:x dependent on family and number of spp. 
   
-  sp = dplyr::filter(famDat, correctedName == paste(famSpp[i,1]))
+  sp = dplyr::filter(famDat, correctedName == paste(famSpp[i,1])) # change famDat/famSpp to allDatFix/spList if reruning outliers
   sp = dplyr::select(sp, decimalLongitude, decimalLatitude)
   
   # write new png --change write-to folder as needed
-  png(file=paste(paste("~/Desktop/bee_gap 2020/ranges/30km with occurrences", paste(famSpp[i,1], ".png"), sep="/")), height = 823, width = 1046)
+  png(file=paste(paste("~/Desktop/bee_gap 2020/ranges/30km with occurrences", paste(famSpp[i,1], ".png"), sep="/")), height = 823, width = 1046) # change famSpp to spList if rerunning outliers
   
   # plot range
   plot(base)
@@ -78,7 +78,7 @@ for (i in c(1:95)) { # again, 1:x dependent on family and number of spp.
   
   # add occurrence points to map
   points(sp$decimalLongitude, sp$decimalLatitude, col = "purple1", pch = 19, cex = .5)
-  title(main = paste(famSpp[i,1]), cex.main = 2)
+  title(main = paste(famSpp[i,1]), cex.main = 2) # change famSpp to spList if rerunning outliers
   
   dev.off()
   
