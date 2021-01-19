@@ -145,9 +145,11 @@ new_df <- left_join(df, temp, by="name") # join temp data frame with csv data fr
     * ((area_range / total_range_sum) * 8000000) - number_existing_occurrence
 
 ```{r}
+# new_df <- read.csv('../output/specieslist_out_2021-01-13.csv') # load this rather than repeat chunk above
 total_range_sum <- sum(new_df$area_range, na.rm = TRUE) # sum area of all ranges
 new_df <- new_df %>% mutate(record_prop = area_range / total_range_sum) # calculate proportion of each range relative to sum of all ranges
-new_df <- new_df %>% mutate(num_records_to_sample = (8000000 * record_prop) - n) # calculate number of undigitized records
+# new_df <- new_df %>% mutate(num_records_to_sample = (8000000 * record_prop) - n) # old method for calculate number of undigitized records
+new_df <- new_df %>% mutate(num_records_to_sample = (6000000 * record_prop)) # calculate number of undigitized records
 write.csv(new_df,sub(".csv", "_out.csv",sub("input","output",input_csv_location)), row.names = FALSE) # write out results
 ```
 
