@@ -17,6 +17,8 @@ image_location = "../images/"
 ```
 ![](`r paste(image_location, 'bees.jpg', sep='')`){width=50%}
 
+# TEST COMMENT
+
 ## Summary of Input Data
 
 The file "input/specieslist.csv" contains a list of 3685 North American species of Hymenoptera. For each taxon, this file contains:
@@ -151,6 +153,7 @@ new_df <- new_df %>% mutate(record_prop = area_range / total_range_sum) # calcul
 # new_df <- new_df %>% mutate(num_records_to_sample = (8000000 * record_prop) - n) # old method for calculate number of undigitized records
 new_df <- new_df %>% mutate(num_records_to_sample = (6000000 * record_prop)) # calculate number of undigitized records
 write.csv(new_df,sub(".csv", "_out.csv",sub("input","output",input_csv_location)), row.names = FALSE) # write out results
+# ggplot(data=new_df %>% filter(num_records_to_sample2 > 0)) + geom_histogram(aes(x=num_records_to_sample2), binwidth = 250)+theme_classic()+scale_x_continuous(breaks=seq(0,20000,1000))
 ```
 
 ## Generate New Points
